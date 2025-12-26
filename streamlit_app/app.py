@@ -100,6 +100,116 @@ for name, path in data_files.items():
     else:
         st.sidebar.warning(f"⚠ {name}")
 
+# Data Collection Buttons - Always Visible
+st.sidebar.markdown("---")
+st.sidebar.subheader("🔄 Data Collection")
+
+# Collect Price Data Button
+if st.sidebar.button("📊 Collect Price Data", use_container_width=True):
+    with st.sidebar:
+        with st.spinner("🔄 Collecting price data..."):
+            try:
+                from src.streaming.stream_prices import fetch_stock_price
+                import pandas as pd
+                from src.utils.helpers import save_csv
+                
+                symbols = available_stocks if available_stocks else Config.STOCKS
+                all_prices = []
+                
+                # Ensure directories exist
+                os.makedirs("data/raw/prices", exist_ok=True)
+                
+                for symbol in symbols:
+                    df = fetch_stock_price(symbol, period="5d")
+                    if not df.empty:
+                        all_prices.append(df)
+                
+                if all_prices:
+                    combined_df = pd.concat(all_prices, ignore_index=True)
+                    save_csv(combined_df, "data/raw/prices/historical_prices.csv")
+                    
+                    latest_prices = combined_df.groupby('symbol').tail(1)
+                    save_csv(latest_prices, "data/raw/prices/latest_price.csv")
+                    
+                    st.sidebar.success(f"✅ Collected price data for {len(symbols)} stocks!")
+                    st.rerun()
+                else:
+                    st.sidebar.error("❌ No price data collected")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error: {e}")
+
+# Scrape News Data Button
+if st.sidebar.button("📰 Scrape News Data", use_container_width=True):
+    with st.sidebar:
+        with st.spinner("📰 Scraping news..."):
+            try:
+                os.makedirs("data/raw/news", exist_ok=True)
+                os.makedirs("data/raw/sentiment", exist_ok=True)
+                
+                from src.scraping.multisource_scraper import MultiSourceScraper
+                
+                symbols = available_stocks if available_stocks else Config.STOCKS
+                scraper = MultiSourceScraper(symbols=symbols)
+                news_df = scraper.scrape_multiple_stocks(symbols=symbols, use_async=True)
+                
+                if news_df is not None and not news_df.empty:
+                    scraper.save_results(news_df, "multisource_news.csv")
+                    st.sidebar.success(f"✅ Scraped {len(news_df)} news articles!")
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠️ No news articles scraped")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error: {e}")
+
+# Scrape Financial Statements Button
+if st.sidebar.button("💰 Scrape Financials", use_container_width=True):
+    with st.sidebar:
+        with st.spinner("💰 Scraping financials..."):
+            try:
+                os.makedirs("data/raw/fundamentals", exist_ok=True)
+                
+                from src.scraping.financial_statements_scraper import FinancialStatementsScraper
+                
+                symbols = available_stocks if available_stocks else Config.STOCKS
+                scraper = FinancialStatementsScraper(symbols=symbols)
+                statements = scraper.scrape_multiple_stocks(use_async=True)
+                
+                if statements:
+                    scraper.save_statements(statements)
+                    st.sidebar.success("✅ Scraped financial statements!")
+                    st.rerun()
+                else:
+                    st.sidebar.warning("⚠️ No financial statements scraped")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error: {e}")
+
+# Generate ML Predictions Button
+if st.sidebar.button("🤖 Generate Predictions", use_container_width=True):
+    with st.sidebar:
+        with st.spinner("🤖 Generating predictions..."):
+            try:
+                import subprocess
+                import sys
+                
+                result = subprocess.run(
+                    [sys.executable, "-m", "src.ml.predict"],
+                    capture_output=True,
+                    text=True,
+                    timeout=120
+                )
+                
+                if result.returncode == 0:
+                    st.sidebar.success("✅ Predictions generated!")
+                    st.rerun()
+                else:
+                    st.sidebar.error("❌ Prediction failed")
+                    if result.stderr:
+                        st.sidebar.code(result.stderr[:200])
+            except subprocess.TimeoutExpired:
+                st.sidebar.error("⏱️ Timed out")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error: {e}")
+
 # PowerBI export button
 st.sidebar.markdown("---")
 if st.sidebar.button("📊 Export to PowerBI", use_container_width=True):

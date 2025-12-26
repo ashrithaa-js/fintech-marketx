@@ -209,3 +209,45 @@ if df is not None and not df.empty:
 else:
     st.warning("No news data found. Please run the multisource scraper first.")
     st.info("Run: `python src/scraping/multisource_scraper.py`")
+    
+    # Add button to run news scraper
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if st.button("📰 Scrape News Data", use_container_width=True, type="primary"):
+            with st.spinner("📰 Scraping news from multiple sources... This may take a few minutes."):
+                try:
+                    import subprocess
+                    import sys
+                    from src.utils.config import Config
+                    
+                    symbols = st.session_state.get('selected_stocks', Config.STOCKS) or Config.STOCKS
+                    
+                    # Ensure directories exist
+                    os.makedirs("data/raw/news", exist_ok=True)
+                    os.makedirs("data/raw/sentiment", exist_ok=True)
+                    
+                    # Run the multisource scraper
+                    from src.scraping.multisource_scraper import MultiSourceScraper
+                    
+                    scraper = MultiSourceScraper(symbols=symbols)
+                    news_df = scraper.scrape_multiple_stocks(symbols=symbols, use_async=True)
+                    
+                    if news_df is not None and not news_df.empty:
+                        scraper.save_results(news_df, "multisource_news.csv")
+                        st.success(f"✅ Successfully scraped {len(news_df)} news articles!")
+                        st.info("🔄 Refreshing page to show updated data...")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ No news articles were scraped. Please check your internet connection.")
+                except Exception as e:
+                    st.error(f"❌ Error scraping news: {e}")
+                    st.info("💡 Try running from terminal: `python src/scraping/multisource_scraper.py`")
+    
+    with col2:
+        st.markdown("""
+        **What this does:**
+        - ✅ Scrapes news from multiple sources (Yahoo, Reuters, MarketWatch, etc.)
+        - ✅ Collects articles for selected stocks
+        - ✅ Saves data to multisource_news.csv
+        - ✅ Supports async scraping for faster collection
+        """)

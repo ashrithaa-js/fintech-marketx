@@ -151,3 +151,40 @@ else:
     st.warning(f"{statement_type} data file not found.")
     st.info("Please run the financial statements scraper first:")
     st.code("python src/scraping/financial_statements_scraper.py")
+    
+    # Add button to run financial statements scraper
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if st.button("💰 Scrape Financial Statements", use_container_width=True, type="primary"):
+            with st.spinner("💰 Scraping financial statements... This may take a few minutes."):
+                try:
+                    from src.utils.config import Config
+                    from src.scraping.financial_statements_scraper import FinancialStatementsScraper
+                    
+                    # Ensure directories exist
+                    os.makedirs("data/raw/fundamentals", exist_ok=True)
+                    
+                    symbols = st.session_state.get('selected_stocks', Config.STOCKS) or Config.STOCKS
+                    
+                    scraper = FinancialStatementsScraper(symbols=symbols)
+                    statements = scraper.scrape_multiple_stocks(use_async=True)
+                    
+                    if statements:
+                        scraper.save_statements(statements)
+                        st.success("✅ Successfully scraped financial statements!")
+                        st.info("🔄 Refreshing page to show updated data...")
+                        st.rerun()
+                    else:
+                        st.warning("⚠️ No financial statements were scraped. Please check your internet connection.")
+                except Exception as e:
+                    st.error(f"❌ Error scraping financial statements: {e}")
+                    st.info("💡 Try running from terminal: `python src/scraping/financial_statements_scraper.py`")
+    
+    with col2:
+        st.markdown("""
+        **What this does:**
+        - ✅ Scrapes Income Statement, Balance Sheet, and Cash Flow
+        - ✅ Collects historical financial data
+        - ✅ Saves data for all selected stocks
+        - ✅ Supports async scraping for faster collection
+        """)

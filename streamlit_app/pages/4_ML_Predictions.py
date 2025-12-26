@@ -397,3 +397,45 @@ else:
     st.error(f"Predictions file not found: {predictions_file}")
     st.info("Please run the ML prediction script first:")
     st.code("python src/ml/predict.py")
+    
+    # Add button to run ML predictions
+    col1, col2 = st.columns([1, 2])
+    with col1:
+        if st.button("🤖 Generate Predictions", use_container_width=True, type="primary"):
+            with st.spinner("🤖 Generating predictions... This may take a moment."):
+                try:
+                    import subprocess
+                    import sys
+                    
+                    # Run the prediction script
+                    result = subprocess.run(
+                        [sys.executable, "-m", "src.ml.predict"],
+                        capture_output=True,
+                        text=True,
+                        timeout=120
+                    )
+                    
+                    if result.returncode == 0:
+                        st.success("✅ Predictions generated successfully!")
+                        st.info("🔄 Refreshing page to show updated predictions...")
+                        st.rerun()
+                    else:
+                        st.error("❌ Error generating predictions:")
+                        st.code(result.stderr, language="text")
+                        if result.stdout:
+                            st.code(result.stdout, language="text")
+                        st.info("💡 Try running from terminal: `python -m src.ml.predict`")
+                except subprocess.TimeoutExpired:
+                    st.error("⏱️ Prediction generation timed out. Please try again.")
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
+                    st.info("💡 Try running from terminal: `python -m src.ml.predict`")
+    
+    with col2:
+        st.markdown("""
+        **What this does:**
+        - ✅ Generates ML predictions for stock prices
+        - ✅ Creates UP/DOWN predictions with confidence scores
+        - ✅ Updates predictions.csv file
+        - ✅ Uses trained ML model for forecasting
+        """)

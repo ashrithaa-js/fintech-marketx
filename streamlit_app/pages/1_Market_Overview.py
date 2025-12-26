@@ -156,6 +156,62 @@ try:
         st.info("Please run the data collection scripts first:")
         st.code("python -m src.streaming.stream_prices")
         
+        # Add button to run price streaming
+        col1, col2 = st.columns([1, 2])
+        with col1:
+            if st.button("🔄 Collect Price Data", use_container_width=True, type="primary"):
+                with st.spinner("🔄 Collecting price data... This may take a moment."):
+                    try:
+                        import subprocess
+                        import sys
+                        from src.utils.config import Config
+                        
+                        # Run price collection (single run, not continuous stream)
+                        from src.streaming.stream_prices import fetch_stock_price
+                        import pandas as pd
+                        from src.utils.helpers import save_csv
+                        
+                        symbols = st.session_state.get('selected_stocks', Config.STOCKS) or Config.STOCKS
+                        all_prices = []
+                        
+                        # Ensure directories exist
+                        os.makedirs("data/raw/prices", exist_ok=True)
+                        
+                        progress_bar = st.progress(0)
+                        status_text = st.empty()
+                        
+                        for i, symbol in enumerate(symbols):
+                            status_text.text(f"Fetching data for {symbol}... ({i+1}/{len(symbols)})")
+                            df = fetch_stock_price(symbol, period="5d")
+                            if not df.empty:
+                                all_prices.append(df)
+                            progress_bar.progress((i + 1) / len(symbols))
+                        
+                        if all_prices:
+                            combined_df = pd.concat(all_prices, ignore_index=True)
+                            save_csv(combined_df, "data/raw/prices/historical_prices.csv")
+                            
+                            latest_prices = combined_df.groupby('symbol').tail(1)
+                            save_csv(latest_prices, "data/raw/prices/latest_price.csv")
+                            
+                            st.success(f"✅ Successfully collected price data for {len(symbols)} stocks!")
+                            st.info("🔄 Refreshing page to show updated data...")
+                            st.rerun()
+                        else:
+                            st.error("❌ No price data was collected. Please check your internet connection and stock symbols.")
+                    except Exception as e:
+                        st.error(f"❌ Error collecting price data: {e}")
+                        st.info("💡 Try running from terminal: `python -m src.streaming.stream_prices`")
+        
+        with col2:
+            st.markdown("""
+            **What this does:**
+            - ✅ Fetches latest price data for selected stocks
+            - ✅ Updates historical prices file
+            - ✅ Creates latest price snapshot
+            - ✅ Supports multi-stock data collection
+            """)
+        
 except Exception as e:
     st.error(f"Error loading data: {e}")
     st.info("Please ensure data files exist in the data/processed/features/ directory")
