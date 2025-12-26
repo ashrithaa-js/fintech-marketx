@@ -102,7 +102,7 @@ for name, path in data_files.items():
 
 # Data Collection Buttons - Always Visible
 st.sidebar.markdown("---")
-st.sidebar.subheader("🔄 Data Collection")
+st.sidebar.subheader("🔄 To Start:")
 
 # Collect Price Data Button
 if st.sidebar.button("📊 Collect Price Data", use_container_width=True):
@@ -188,27 +188,51 @@ if st.sidebar.button("🤖 Generate Predictions", use_container_width=True):
     with st.sidebar:
         with st.spinner("🤖 Generating predictions..."):
             try:
-                import subprocess
-                import sys
+                # Check if features file exists first
+                features_file = "data/processed/features/features.csv"
+                if not os.path.exists(features_file):
+                    st.sidebar.error("❌ Features file not found!")
+                    st.sidebar.info("💡 Please collect price data first to generate features.")
+                    st.sidebar.info("Click '📊 Collect Price Data' button first.")
+                    st.stop()
                 
-                result = subprocess.run(
-                    [sys.executable, "-m", "src.ml.predict"],
-                    capture_output=True,
-                    text=True,
-                    timeout=120
-                )
+                # Check if model exists, train if not
+                if not os.path.exists("model.pkl"):
+                    st.sidebar.warning("⚠️ Model not found. Training model first...")
+                    try:
+                        from src.ml.train_model import train
+                        train()
+                        st.sidebar.success("✅ Model trained successfully!")
+                    except Exception as train_error:
+                        st.sidebar.error(f"❌ Model training failed: {str(train_error)[:200]}")
+                        st.sidebar.info("💡 Make sure features.csv has valid data.")
+                        st.stop()
                 
-                if result.returncode == 0:
-                    st.sidebar.success("✅ Predictions generated!")
-                    st.rerun()
-                else:
-                    st.sidebar.error("❌ Prediction failed")
-                    if result.stderr:
-                        st.sidebar.code(result.stderr[:200])
-            except subprocess.TimeoutExpired:
-                st.sidebar.error("⏱️ Timed out")
+                # Call predict function directly (better than subprocess)
+                try:
+                    from src.ml.predict import predict
+                    predict()
+                    
+                    # Check if predictions file was created
+                    if os.path.exists("data/processed/features/predictions.csv"):
+                        st.sidebar.success("✅ Predictions generated successfully!")
+                        st.rerun()
+                    else:
+                        st.sidebar.warning("⚠️ Predictions file not created. Check logs for errors.")
+                except Exception as predict_error:
+                    error_msg = str(predict_error)
+                    st.sidebar.error(f"❌ Prediction error: {error_msg[:300]}")
+                    if "sklearn" in error_msg.lower() or "scikit" in error_msg.lower():
+                        st.sidebar.info("💡 Missing sklearn package. Install: pip install scikit-learn")
+                    elif "model" in error_msg.lower():
+                        st.sidebar.info("💡 Model issue. Try training the model again.")
+                    
             except Exception as e:
-                st.sidebar.error(f"❌ Error: {e}")
+                st.sidebar.error(f"❌ Error: {str(e)[:200]}")
+                import traceback
+                error_details = traceback.format_exc()[:400]
+                with st.sidebar.expander("🔍 Error Details"):
+                    st.code(error_details)
 
 # PowerBI export button
 st.sidebar.markdown("---")
