@@ -118,6 +118,7 @@ if st.sidebar.button("📊 Collect Price Data", use_container_width=True):
                 
                 # Ensure directories exist
                 os.makedirs("data/raw/prices", exist_ok=True)
+                os.makedirs("data/processed/features", exist_ok=True)
                 
                 for symbol in symbols:
                     df = fetch_stock_price(symbol, period="5d")
@@ -131,7 +132,29 @@ if st.sidebar.button("📊 Collect Price Data", use_container_width=True):
                     latest_prices = combined_df.groupby('symbol').tail(1)
                     save_csv(latest_prices, "data/raw/prices/latest_price.csv")
                     
-                    st.sidebar.success(f"✅ Collected price data for {len(symbols)} stocks!")
+                    # Automatically generate features.csv from historical prices
+                    st.sidebar.info("📊 Generating features...")
+                    try:
+                        # Create target column (next day price > current price)
+                        features_df = combined_df.copy()
+                        features_df["target"] = (features_df["Close"].shift(-1) > features_df["Close"]).astype(int)
+                        features_df.dropna(inplace=True)
+                        
+                        # Select available columns for features
+                        feature_cols = []
+                        for col in ["Open", "High", "Low", "Close", "Volume", "target"]:
+                            if col in features_df.columns:
+                                feature_cols.append(col)
+                        
+                        if feature_cols:
+                            features_output = features_df[feature_cols].copy()
+                            features_output.to_csv("data/processed/features/features.csv", index=False)
+                            st.sidebar.success(f"✅ Collected price data and generated features for {len(symbols)} stocks!")
+                        else:
+                            st.sidebar.warning("⚠️ Price data collected but couldn't generate features (missing columns)")
+                    except Exception as feat_error:
+                        st.sidebar.warning(f"⚠️ Price data collected but feature generation failed: {str(feat_error)[:100]}")
+                    
                     st.rerun()
                 else:
                     st.sidebar.error("❌ No price data collected")
