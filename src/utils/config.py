@@ -12,7 +12,7 @@ class Config:
     LOGS = "data/logs/"
 
     # Stocks
-    STOCKS = ["AAPL", "TSLA", "MSFT", "GOOG", "NVDA"]
+    STOCKS = ["AAPL", "TSLA", "MSFT", "GOOG", "NVDA", "JPM"]
 
     # API / URLs
     API_KEY = os.getenv("ALPHA_VANTAGE_KEY", "")
